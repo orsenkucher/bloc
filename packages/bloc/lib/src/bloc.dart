@@ -176,24 +176,50 @@ abstract class Bloc<Event, State> extends Stream<State> implements Sink<Event> {
     Stream<Transition<Event, State>> transitions,
   ) {
     return transitions;
+    // return transitions.distinct((prev, cur) {
+    //   // return true;
+    //   print('***********************');
+    //   // print('$prev  $cur');
+    //   print(prev.nextState);
+    //   print(cur.nextState);
+    //   // print(prev == cur);
+    //   print(prev.nextState == cur.nextState);
+    //   // return prev == cur;
+    //   return prev.nextState == cur.nextState;
+    // });
+    // return transitions
+    //     .where((transition) => transition.currentState != transition.nextState);
   }
 
   void _bindEventsToStates() {
     _transitionSubscription = transformTransitions(transformEvents(
       _eventController.stream,
       (event) {
-        return mapEventToState(event).map((nextState) {
+        return mapEventToState(event)
+            // .distinct((prev, cur) {
+            //   // return true;
+            //   print('==========================');
+            //   print('$prev  $cur');
+            //   return prev == cur;
+            // })
+            // .distinct()
+            .map((nextState) {
           return Transition(
             currentState: state,
             event: event,
             nextState: nextState,
           );
-        }).skipWhile((transition) {
-          return state == transition.nextState || _stateController.isClosed;
+        })
+            // .where((x) => x.nextState != x.currentState)
+            // .distinct((p, n) => p.nextState == n.nextState)
+            // .distinct()
+            .skipWhile((transition) {
+          return _stateController.isClosed;
         });
       },
-    )).listen(
+    ).distinct((p, n) => p.nextState == n.nextState)).listen(
       (transition) {
+        print(transition);
         try {
           BlocSupervisor.delegate.onTransition(this, transition);
           onTransition(transition);

@@ -5,6 +5,7 @@ import 'package:mockito/mockito.dart';
 import 'package:test/test.dart';
 
 import './helpers/helpers.dart';
+import 'helpers/delayed/delayed_bloc.dart';
 
 class MockBlocDelegate extends Mock implements BlocDelegate {}
 
@@ -149,6 +150,20 @@ void main() {
         final initialState = await complexBloc.first;
         expect(initialState, complexBloc.initialState);
       });
+
+      // test('can emit initial state twice', () async {
+      //   final expectedStates = <ComplexState>[
+      //     ComplexStateA(),
+      //     ComplexStateC(),
+      //     ComplexStateA(),
+      //   ];
+      //   final states = <ComplexState>[];
+      //   complexBloc.listen(states.add);
+      //   complexBloc.add(ComplexEventC());
+      //   complexBloc.add(ComplexEventA());
+      //   await complexBloc.close();
+      //   expectLater(states, expectedStates);
+      // });
 
       test('should map single event to correct state', () {
         final expectedStates = [
@@ -368,6 +383,62 @@ void main() {
       });
     });
 
+    group('Delayed Bloc', () {
+      DelayedBloc delayedBloc;
+      MockBlocDelegate delegate;
+
+      setUp(() {
+        delayedBloc = DelayedBloc();
+        delegate = MockBlocDelegate();
+        when(delegate.onTransition(any, any)).thenReturn(null);
+
+        BlocSupervisor.delegate = delegate;
+      });
+
+      // test('close does not emit new states over the state stream', () {
+      //   final expectedStates = [
+      //     equals(1),
+      //     equals(101),
+      //     equals(102),
+      //     equals(101),
+      //     emitsDone,
+      //   ];
+      //   expectLater(
+      //     delayedBloc,
+      //     emitsInOrder(expectedStates),
+      //   );
+
+      //   delayedBloc.add(101);
+      //   delayedBloc.add(102);
+      //   delayedBloc.add(101);
+      //   delayedBloc.close();
+      //   delayedBloc.add(201);
+      // });
+
+      test('reemit', () async {
+        final expectedStates = [
+          equals(1),
+          equals(1),
+          equals(2),
+          equals(101),
+          emitsDone,
+        ];
+        expectLater(
+          delayedBloc,
+          emitsInOrder(expectedStates),
+        );
+
+        delayedBloc.add(1);
+        delayedBloc.add(1);
+        delayedBloc.add(1);
+        delayedBloc.add(2);
+        delayedBloc.add(2);
+        delayedBloc.add(2);
+        delayedBloc.add(101);
+        delayedBloc.add(101);
+        await delayedBloc.close();
+      });
+    });
     group('Async Bloc', () {
       AsyncBloc asyncBloc;
       MockBlocDelegate delegate;
@@ -390,6 +461,25 @@ void main() {
 
         asyncBloc.close();
       });
+
+      // test(
+      //     'close does not emit new states over'
+      //     'the state stream after event', () {
+      //   final expectedStates = [
+      //     equals(AsyncState.initial()),
+      //     equals(AsyncState.initial().copyWith(isLoading: true)),
+      //     equals(AsyncState.initial().copyWith(isSuccess: true)),
+      //     emitsDone,
+      //   ];
+      //   asyncBloc.add(AsyncEvent());
+      //   expectLater(
+      //     asyncBloc,
+      //     emitsInOrder(expectedStates),
+      //   );
+      //   asyncBloc.add(AsyncEvent());
+
+      //   asyncBloc.close();
+      // });
 
       test(
           'close while events are pending finishes processing pending events '
