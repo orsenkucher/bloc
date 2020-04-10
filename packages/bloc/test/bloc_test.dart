@@ -5,6 +5,7 @@ import 'package:mockito/mockito.dart';
 import 'package:test/test.dart';
 
 import './helpers/helpers.dart';
+import 'helpers/breaker/blocbreaker.dart';
 
 class MockBlocDelegate extends Mock implements BlocDelegate {}
 
@@ -367,7 +368,35 @@ void main() {
         await expectLater(counterBloc, emits(1));
       });
     });
+    group('Bloc Breaker', () {
+      BlocBreakerBloc bloc;
+      MockBlocDelegate delegate;
 
+      setUp(() {
+        bloc = BlocBreakerBloc();
+        delegate = MockBlocDelegate();
+        when(delegate.onTransition(any, any)).thenReturn(null);
+
+        BlocSupervisor.delegate = delegate;
+      });
+
+      test('ye-ye it breaks things', () async {
+        final expectedStates = [
+          equals(0),
+          equals(1),
+          equals(2),
+          equals(1),
+          // equals(1),
+          emitsDone,
+        ];
+        expectLater(
+          bloc,
+          emitsInOrder(expectedStates),
+        );
+        bloc.add(Object);
+        await bloc.close();
+      });
+    });
     group('Async Bloc', () {
       AsyncBloc asyncBloc;
       MockBlocDelegate delegate;
