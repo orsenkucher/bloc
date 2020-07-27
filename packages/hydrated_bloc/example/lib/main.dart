@@ -13,7 +13,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   HydratedBloc.storage = await HydratedStorage.build();
   HydratedScope.config({
-    "secure_scope": await HydratedStorage.build(scope: "secured"),
+    'secure_scope': await HydratedStorage.build(scope: 'secured'),
   });
   runApp(App());
 }
@@ -26,9 +26,20 @@ class App extends StatelessWidget {
         builder: (context, brightness) {
           return MaterialApp(
             theme: ThemeData(brightness: brightness),
-            home: BlocProvider<CounterBloc>(
-              create: (_) => CounterBloc(),
-              child: CounterPage(),
+            home: BlocBuilder<StorageCubit, Storage>(
+              builder: (context, storage) => {
+                Storage.plain: BlocProvider<CounterBloc>(
+                  create: (_) => CounterBloc(),
+                  child: CounterPage(),
+                ),
+                Storage.secured: HydratedScope(
+                  token: 'secure_scope',
+                  child: BlocProvider<CounterBloc>(
+                    create: (_) => CounterBloc(),
+                    child: CounterPage(storage: 'Secure storage'),
+                  ),
+                ),
+              }[storage],
             ),
           );
         },
@@ -48,6 +59,10 @@ class App extends StatelessWidget {
 }
 
 class CounterPage extends StatelessWidget {
+  const CounterPage({Key key, this.storage}) : super(key: key);
+
+  final String storage;
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -55,9 +70,15 @@ class CounterPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Counter')),
       body: BlocBuilder<CounterBloc, int>(
         builder: (BuildContext context, int state) {
-          return Center(
-            child: Text('$state', style: textTheme.headline2),
-          );
+          return Stack(children: <Widget>[
+            Align(
+              alignment: Alignment.topCenter,
+              child: Text(storage ?? '', style: textTheme.headline2),
+            ),
+            Center(
+              child: Text('$state', style: textTheme.headline2),
+            )
+          ]);
         },
       ),
       floatingActionButton: Column(
