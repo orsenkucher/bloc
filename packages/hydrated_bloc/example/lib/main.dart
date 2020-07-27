@@ -78,13 +78,10 @@ class App extends StatelessWidget {
   }
 
   Widget _cubits({@required Widget child}) {
-    return MultiBlocProvider(
-      child: child,
-      providers: [
-        BlocProvider(create: (_) => BrightnessCubit()),
-        BlocProvider(create: (_) => StorageCubit()),
-      ],
-    );
+    return MultiBlocProvider(child: child, providers: [
+      BlocProvider(create: (_) => BrightnessCubit()),
+      BlocProvider(create: (_) => StorageCubit()),
+    ]);
   }
 }
 
@@ -105,9 +102,7 @@ class CounterPage extends StatelessWidget {
               alignment: Alignment.topCenter,
               child: Text(storage ?? '', style: textTheme.headline2),
             ),
-            Center(
-              child: Text('$state', style: textTheme.headline2),
-            )
+            Center(child: Text('$state', style: textTheme.headline2))
           ]);
         },
       ),
