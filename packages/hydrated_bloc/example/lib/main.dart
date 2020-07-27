@@ -14,9 +14,6 @@ void main() async {
   // As a result, you will need the following line if you're using Flutter >=1.9.4.
   WidgetsFlutterBinding.ensureInitialized();
   HydratedBloc.storage = await HydratedStorage.build();
-  // HydratedScope.config({
-  //   'secure_scope': await HydratedStorage.build(scope: 'secured'),
-  // });
   runApp(App());
 }
 
@@ -29,27 +26,12 @@ class App extends StatelessWidget {
           return MaterialApp(
             theme: ThemeData(brightness: brightness),
             home: BlocBuilder<StorageCubit, Storage>(
-              builder: (context, storage) => {
-                Storage.plain: BlocProvider<CounterBloc>(
-                  create: (_) => CounterBloc(),
-                  child: CounterPage(),
-                ),
-                Storage.secured: HydratedScope(
-                  token: 'secure_scope',
-                  child: FutureBuilder(
-                    future: _openSecured(),
-                    builder: (context, snapshot) {
-                      if (ConnectionState.done == snapshot.connectionState) {
-                        return BlocProvider<CounterBloc>(
-                          create: (_) => CounterBloc(),
-                          child: CounterPage(storage: 'Secure storage'),
-                        );
-                      }
-                      return Container();
-                    },
-                  ),
-                ),
-              }[storage],
+              builder: (context, storage) {
+                if (storage == Storage.secure) {
+                  return _pageSecureStorage();
+                }
+                return _pagePlainStorage();
+              },
             ),
           );
         },
@@ -57,14 +39,41 @@ class App extends StatelessWidget {
     );
   }
 
-  Future<void> _openSecured() async {
-    print('opening secured');
+  HydratedScope _pageSecureStorage() {
+    return HydratedScope(
+      token: 'secure_scope',
+      child: FutureBuilder(
+        future: _openSecureStorage(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return BlocProvider<CounterBloc>(
+              create: (_) => CounterBloc(),
+              child: CounterPage(storage: 'Secure storage'),
+            );
+          }
+          return Container();
+        },
+      ),
+    );
+  }
+
+  BlocProvider<CounterBloc> _pagePlainStorage() {
+    return BlocProvider<CounterBloc>(
+      create: (_) => CounterBloc(),
+      child: CounterPage(),
+    );
+  }
+
+  Future<void> _openSecureStorage() async {
+    print('opening secure storage');
     const password = 'hydration';
     final byteskey = sha256.convert(utf8.encode(password)).bytes;
     final cipher = HydratedAesCipher(byteskey);
     HydratedScope.config({
       'secure_scope': await HydratedStorage.build(
-          scope: 'secured', encryptionCipher: cipher)
+        scope: 'secure',
+        encryptionCipher: cipher,
+      )
     });
   }
 
@@ -91,7 +100,7 @@ class CounterPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Counter')),
       body: BlocBuilder<CounterBloc, int>(
         builder: (BuildContext context, int state) {
-          return Stack(children: <Widget>[
+          return Stack(children: [
             Align(
               alignment: Alignment.topCenter,
               child: Text(storage ?? '', style: textTheme.headline2),
@@ -105,7 +114,7 @@ class CounterPage extends StatelessWidget {
       floatingActionButton: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisAlignment: MainAxisAlignment.end,
-        children: <Widget>[
+        children: [
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
@@ -122,7 +131,7 @@ class CounterPage extends StatelessWidget {
                 return FloatingActionButton(
                   child: Icon(const {
                     Storage.plain: Icons.security,
-                    Storage.secured: Icons.supervised_user_circle,
+                    Storage.secure: Icons.supervised_user_circle,
                   }[storage]),
                   onPressed: () {
                     context.bloc<StorageCubit>().toggleStorage();
@@ -213,12 +222,12 @@ class BrightnessCubit extends HydratedCubit<Brightness> {
   }
 }
 
-enum Storage { plain, secured }
+enum Storage { plain, secure }
 
 extension StorageExtension on Storage {
   Storage operator ~() => const {
-        Storage.plain: Storage.secured,
-        Storage.secured: Storage.plain,
+        Storage.plain: Storage.secure,
+        Storage.secure: Storage.plain,
       }[this];
 }
 
