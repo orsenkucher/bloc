@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:crypto/crypto.dart';
 
 void main() async {
   // https://github.com/flutter/flutter/pull/38464
@@ -12,9 +14,9 @@ void main() async {
   // As a result, you will need the following line if you're using Flutter >=1.9.4.
   WidgetsFlutterBinding.ensureInitialized();
   HydratedBloc.storage = await HydratedStorage.build();
-  HydratedScope.config({
-    'secure_scope': await HydratedStorage.build(scope: 'secured'),
-  });
+  // HydratedScope.config({
+  //   'secure_scope': await HydratedStorage.build(scope: 'secured'),
+  // });
   runApp(App());
 }
 
@@ -34,9 +36,17 @@ class App extends StatelessWidget {
                 ),
                 Storage.secured: HydratedScope(
                   token: 'secure_scope',
-                  child: BlocProvider<CounterBloc>(
-                    create: (_) => CounterBloc(),
-                    child: CounterPage(storage: 'Secure storage'),
+                  child: FutureBuilder(
+                    future: _openSecured(),
+                    builder: (context, snapshot) {
+                      if (ConnectionState.done == snapshot.connectionState) {
+                        return BlocProvider<CounterBloc>(
+                          create: (_) => CounterBloc(),
+                          child: CounterPage(storage: 'Secure storage'),
+                        );
+                      }
+                      return Container();
+                    },
                   ),
                 ),
               }[storage],
@@ -45,6 +55,17 @@ class App extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _openSecured() async {
+    print('opening secured');
+    const password = 'hydration';
+    final byteskey = sha256.convert(utf8.encode(password)).bytes;
+    final cipher = HydratedAesCipher(byteskey);
+    HydratedScope.config({
+      'secure_scope': await HydratedStorage.build(
+          scope: 'secured', encryptionCipher: cipher)
+    });
   }
 
   Widget _cubits({@required Widget child}) {
