@@ -12,14 +12,16 @@ void main() async {
   // As a result, you will need the following line if you're using Flutter >=1.9.4.
   WidgetsFlutterBinding.ensureInitialized();
   HydratedBloc.storage = await HydratedStorage.build();
+  HydratedScope.config({
+    "secure_scope": await HydratedStorage.build(scope: "secured"),
+  });
   runApp(App());
 }
 
 class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => BrightnessCubit(),
+    return _cubits(
       child: BlocBuilder<BrightnessCubit, Brightness>(
         builder: (context, brightness) {
           return MaterialApp(
@@ -31,6 +33,16 @@ class App extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  Widget _cubits({@required Widget child}) {
+    return MultiBlocProvider(
+      child: child,
+      providers: [
+        BlocProvider(create: (_) => BrightnessCubit()),
+        BlocProvider(create: (_) => StorageCubit()),
+      ],
     );
   }
 }
@@ -53,7 +65,7 @@ class CounterPage extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.end,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.brightness_6),
               onPressed: () {
@@ -62,7 +74,23 @@ class CounterPage extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: BlocBuilder<StorageCubit, Storage>(
+              builder: (context, storage) {
+                return FloatingActionButton(
+                  child: Icon(const {
+                    Storage.plain: Icons.security,
+                    Storage.secured: Icons.supervised_user_circle,
+                  }[storage]),
+                  onPressed: () {
+                    context.bloc<StorageCubit>().toggleStorage();
+                  },
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.add),
               onPressed: () {
@@ -71,7 +99,7 @@ class CounterPage extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.remove),
               onPressed: () {
@@ -80,7 +108,7 @@ class CounterPage extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.delete_forever),
               onPressed: () async {
@@ -140,5 +168,30 @@ class BrightnessCubit extends HydratedCubit<Brightness> {
   @override
   Map<String, dynamic> toJson(Brightness state) {
     return <String, int>{'brightness': state.index};
+  }
+}
+
+enum Storage { plain, secured }
+
+extension StorageExtension on Storage {
+  Storage operator ~() => const {
+        Storage.plain: Storage.secured,
+        Storage.secured: Storage.plain,
+      }[this];
+}
+
+class StorageCubit extends HydratedCubit<Storage> {
+  StorageCubit() : super(Storage.plain);
+
+  void toggleStorage() => emit(~state);
+
+  @override
+  Storage fromJson(Map<String, dynamic> json) {
+    return Storage.values[json['storage'] as int];
+  }
+
+  @override
+  Map<String, dynamic> toJson(Storage state) {
+    return <String, int>{'storage': state.index};
   }
 }
