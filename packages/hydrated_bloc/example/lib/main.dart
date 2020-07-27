@@ -39,7 +39,21 @@ class App extends StatelessWidget {
     );
   }
 
-  HydratedScope _pageSecureStorage() {
+  Widget _cubits({@required Widget child}) {
+    return MultiBlocProvider(child: child, providers: [
+      BlocProvider(create: (_) => BrightnessCubit()),
+      BlocProvider(create: (_) => StorageCubit()),
+    ]);
+  }
+
+  BlocProvider<CounterBloc> _pagePlainStorage() {
+    return BlocProvider<CounterBloc>(
+      create: (_) => CounterBloc(),
+      child: CounterPage(),
+    );
+  }
+
+  Widget _pageSecureStorage() {
     return HydratedScope(
       token: 'secure_scope',
       child: FutureBuilder(
@@ -57,13 +71,6 @@ class App extends StatelessWidget {
     );
   }
 
-  BlocProvider<CounterBloc> _pagePlainStorage() {
-    return BlocProvider<CounterBloc>(
-      create: (_) => CounterBloc(),
-      child: CounterPage(),
-    );
-  }
-
   Future<void> _openSecureStorage() async {
     print('opening secure storage');
     const password = 'hydration';
@@ -75,13 +82,6 @@ class App extends StatelessWidget {
         encryptionCipher: cipher,
       )
     });
-  }
-
-  Widget _cubits({@required Widget child}) {
-    return MultiBlocProvider(child: child, providers: [
-      BlocProvider(create: (_) => BrightnessCubit()),
-      BlocProvider(create: (_) => StorageCubit()),
-    ]);
   }
 }
 
