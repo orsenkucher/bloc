@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:crypto/crypto.dart';
 
 void main() async {
   // https://github.com/flutter/flutter/pull/38464
@@ -18,24 +20,76 @@ void main() async {
 class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => BrightnessCubit(),
+    return _cubits(
       child: BlocBuilder<BrightnessCubit, Brightness>(
         builder: (context, brightness) {
           return MaterialApp(
             theme: ThemeData(brightness: brightness),
-            home: BlocProvider<CounterBloc>(
-              create: (_) => CounterBloc(),
-              child: CounterPage(),
+            home: BlocBuilder<StorageCubit, Storage>(
+              builder: (context, storage) {
+                if (storage == Storage.secure) {
+                  return _pageSecureStorage();
+                }
+                return _pagePlainStorage();
+              },
             ),
           );
         },
       ),
     );
   }
+
+  Widget _cubits({@required Widget child}) {
+    return MultiBlocProvider(child: child, providers: [
+      BlocProvider(create: (_) => BrightnessCubit()),
+      BlocProvider(create: (_) => StorageCubit()),
+    ]);
+  }
+
+  BlocProvider<CounterBloc> _pagePlainStorage() {
+    return BlocProvider<CounterBloc>(
+      create: (_) => CounterBloc(),
+      child: CounterPage(),
+    );
+  }
+
+  Widget _pageSecureStorage() {
+    return HydratedScope(
+      token: 'secure_scope',
+      child: FutureBuilder(
+        future: _openSecureStorage(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return BlocProvider<CounterBloc>(
+              create: (_) => CounterBloc(),
+              child: CounterPage(storage: 'Secure storage'),
+            );
+          }
+          return Container();
+        },
+      ),
+    );
+  }
+
+  Future<void> _openSecureStorage() async {
+    print('opening secure storage');
+    const password = 'hydration';
+    final byteskey = sha256.convert(utf8.encode(password)).bytes;
+    final cipher = HydratedAesCipher(byteskey);
+    HydratedScope.config({
+      'secure_scope': await HydratedStorage.build(
+        scope: 'secure',
+        encryptionCipher: cipher,
+      )
+    });
+  }
 }
 
 class CounterPage extends StatelessWidget {
+  const CounterPage({Key key, this.storage}) : super(key: key);
+
+  final String storage;
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -43,17 +97,21 @@ class CounterPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Counter')),
       body: BlocBuilder<CounterBloc, int>(
         builder: (BuildContext context, int state) {
-          return Center(
-            child: Text('$state', style: textTheme.headline2),
-          );
+          return Stack(children: [
+            Align(
+              alignment: Alignment.topCenter,
+              child: Text(storage ?? '', style: textTheme.headline2),
+            ),
+            Center(child: Text('$state', style: textTheme.headline2))
+          ]);
         },
       ),
       floatingActionButton: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisAlignment: MainAxisAlignment.end,
-        children: <Widget>[
+        children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.brightness_6),
               onPressed: () {
@@ -62,7 +120,23 @@ class CounterPage extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: BlocBuilder<StorageCubit, Storage>(
+              builder: (context, storage) {
+                return FloatingActionButton(
+                  child: Icon(const {
+                    Storage.plain: Icons.security,
+                    Storage.secure: Icons.supervised_user_circle,
+                  }[storage]),
+                  onPressed: () {
+                    context.bloc<StorageCubit>().toggleStorage();
+                  },
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.add),
               onPressed: () {
@@ -71,7 +145,7 @@ class CounterPage extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.remove),
               onPressed: () {
@@ -80,7 +154,7 @@ class CounterPage extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: FloatingActionButton(
               child: const Icon(Icons.delete_forever),
               onPressed: () async {
@@ -140,5 +214,30 @@ class BrightnessCubit extends HydratedCubit<Brightness> {
   @override
   Map<String, dynamic> toJson(Brightness state) {
     return <String, int>{'brightness': state.index};
+  }
+}
+
+enum Storage { plain, secure }
+
+extension StorageExtension on Storage {
+  Storage operator ~() => const {
+        Storage.plain: Storage.secure,
+        Storage.secure: Storage.plain,
+      }[this];
+}
+
+class StorageCubit extends HydratedCubit<Storage> {
+  StorageCubit() : super(Storage.plain);
+
+  void toggleStorage() => emit(~state);
+
+  @override
+  Storage fromJson(Map<String, dynamic> json) {
+    return Storage.values[json['storage'] as int];
+  }
+
+  @override
+  Map<String, dynamic> toJson(Storage state) {
+    return <String, int>{'storage': state.index};
   }
 }

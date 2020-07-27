@@ -6,6 +6,7 @@ environment:
   sdk: ">=2.6.0 <3.0.0"
 
 dependencies:
+  crypto: ^2.1.5
   flutter:
     sdk: flutter
   hydrated_bloc:
